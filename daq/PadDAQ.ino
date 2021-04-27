@@ -11,8 +11,8 @@
 #define DEBUGGING false
 
 // global constants
-const int PT_OFFSET = 0.996;
-const int PT_SCALE = 0.00408;
+const float PT_OFFSET = 0.996;
+const float PT_SCALE = 0.00408;
 
 // link necessary libraries
 #include <SoftwareSerial.h>
