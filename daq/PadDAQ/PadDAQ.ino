@@ -5,17 +5,35 @@
  */
 
 // pin numbers
+#define PIN_PT0 A0
 #define PIN_PT1 A1
-#define PIN_PT2 A2
+
+// buffer index
+#define ID_PT0 0
+#define ID_PT1 1
+//#define ID_OTHER 2
+
+// validity flag encodings
+#define F_PT0 0b00000001 //1
+#define F_PT1 0b00000010 //2
+//#define F_OTHER 0b00000100 //4
+
+// calibration factors
+const float PT_OFFSET[NUM_OF_PT] = {-209.38, 11.924};
+const float PT_SCALE[NUM_OF_PT] = {244.58, 178.51};
 
 // configurable parameters
 #define DEBUGGING false
+#define BAUD_RATE 57600 // bits per second being transmitted
+#define OFFSET_DELAY_TX 0 // specify additional flat "delay" added to minimum calculated delay to avoid corruption
+#define NUM_OF_PT 2
+#define NUM_OF_TC 0
+#define NUM_OF_LC 0
 
-// global constants
-const float PT1_OFFSET = -209.38;
-const float PT1_SCALE = 244.58;
-const float PT2_OFFSET = 11.924;
-const float PT2_SCALE = 178.51;
+// macros
+#define MIN_DELAY_TX (1/(BAUD_RATE/10))*1000*2 // refer to `https://github.com/UCLA-Rocket-Project/prometheus-groundsys-2021/blob/main/docs/safer_serial_transmission_practices.md`
+#define DELAY_TX MIN_DELAY_TX + OFFSET_DELAY_TX
+#define DATA_BUF_SIZE NUM_OF_PT*1 + NUM_OF_TC*0 + NUM_OF_LC*0
 
 // link necessary libraries
 #include <SoftwareSerial.h>
@@ -23,10 +41,18 @@ const float PT2_SCALE = 178.51;
 // init SoftwareSerial connection to bunker
 SoftwareSerial to_bunker_connection(4, 8); // RX, TX
  
-// init `float` variable used as buffer for PT data
-float pt1_data = -1;
-float pt2_data = -1;
-  
+// Data struct (packages data with valid flag)
+struct Data
+{
+  bool valid;
+  float data;
+};
+
+// init buffers for data/valid flags
+Data buf[DATA_BUF_SIZE];
+unsigned long timestamp;
+int valid; // since our total number of sensors is smaller than 16, this will work fine (2 bytes, 16 bits => at most 16 signals); should this number ever increase, we can use a bigger datatype (like long, 4 bytes)
+
 void setup()
 {
   // start Serial connections
@@ -35,36 +61,72 @@ void setup()
     Serial.begin(9600);
   }
 
-  to_bunker_connection.begin(57600);
+  to_bunker_connection.begin(BAUD_RATE);
 }
 
 void loop()
 {
-  // clear data buffers
-  pt1_data = -1;
-  pt2_data = -1;
+  // reset data buffers
+  reset_buffers();
 
-  // get and convert current PT readings
-  pt1_data = get_psi_from_raw_pt_data(analogRead(PIN_PT1), 1);
-  pt2_data = get_psi_from_raw_pt_data(analogRead(PIN_PT2), 2);
+  // poll data and preprocess (if needed)
+  timestamp = millis();
+  data[ID_PT0] = get_psi_from_raw_pt_data(analogRead(PIN_PT0), 0);
+  data[ID_PT1] = get_psi_from_raw_pt_data(analogRead(PIN_PT1), 1);
+
+  // properly update all valid flags for packet metadata
+  update_valid(&valid, pt_data, 0, F_PT0); // PT0
+  update_valid(&valid, pt_data, 1, F_PT1); // PT1
+
+  // compute data checksum
+  // checksum = get_checksum();
 
   // send metadata portion of datapacket
-  //to_bunker_connection.write('s'); // indicate start of transmission
-  //to_bunker_connection.write(sizeof(pt_data)); // send single byte representing size of data transmitted
+  to_bunker_connection.write('s'); // indicate start of transmission
+  to_bunker_connection.write(valid); // send byte of data validity information
+  // to_bunker_connection.print(checksum); // send checksum
+  to_bunker_connection.write(DATA_BUF_SIZE + 1); // send single byte representing number of floats (data) transmitted (+ 1 for timestamp)
 
   // send data portion of datapacket
-  to_bunker_connection.println(pt1_data); // send single float of PT1 data
-  to_bunker_connection.println(pt2_data); // send single float of PT1 data
+  to_bunker_connection.print(timestamp); // send timestamp of data
+
+  for (int i = 0; i < DATA_BUF_SIZE; i++)
+  {
+    to_bunker_connection.print(',');
+    to_bunker_connection.print(buf[i].data); // send single float of data
+  }
 
   // output to Serial debugging information
   if (DEBUGGING)
   {
-    Serial.println(pt1_data);
-    Serial.println(pt2_data);
+    Serial.print(buf[0].data); // send first float of data
+
+    for (int i = 1; i < DATA_BUF_SIZE; i++)
+    {
+      Serial.print(',');
+      Serial.print(buf[i].data); // send single float of data
+    }
   }
 
   // delay so we don't sample too fast :)
-  delay(10);
+  delay(DELAY_TX);
+}
+
+void update_valid(int* valid_sig, Data* buf, int i, int valid_encoding)
+{
+  // check if data is valid
+  if (buf[i].valid)
+    (*valid_sig) |= valid_encoding;
+}
+
+void reset_buffers()
+{
+  timestamp = 0;
+  valid = 0;
+
+  // invalidate data buffer (no need to reset data field since we've invalidated it)
+  for (int i = 0; i < DATA_BUF_SIZE; i++)
+    data[i].valid = false;
 }
 
 /*
@@ -78,21 +140,23 @@ void loop()
  * 
  * Returns: float representing pressure (in PSI) corresponding to PT reading
  */
-float get_psi_from_raw_pt_data(int raw_data, int pt_num)
+Data get_psi_from_raw_pt_data(int raw_data, int pt_num)
 {
-  float offset;
-  float scale;
+  // assume data is invalid (default)
+  Data res;
+  res.valid = false;
+  res.data = -1;
 
-  if (pt_num == 1)
+  // check for proper inputs
+  if (pt_num >= NUM_OF_PT || pt_num < 0 || raw_data < 0 || raw_data > 1023)
   {
-    offset = PT1_OFFSET;
-    scale = PT1_SCALE;
+    // data is already invalidated, so just return
+    return res;
   }
-  else if (pt_num == 2)
-  {
-    offset = PT2_OFFSET;
-    scale = PT2_SCALE;
-  }
+
+  // get calibration factors for specified PT
+  float offset = PT_OFFSET[pt_num];
+  float scale = PT_SCALE[pt_num];
 
   // convert to voltage
   float voltage = raw_data * (5.0/1023.0); // arduino-defined conversion from raw analog value to voltage
@@ -100,6 +164,10 @@ float get_psi_from_raw_pt_data(int raw_data, int pt_num)
   // convert to psi (consider calibration factors)
   float psi = voltage*scale + offset; 
 
+  // store data and validate
+  res.data = psi;
+  res.valid = true;
+
   // return value
-  return psi;
+  return res;
 }
