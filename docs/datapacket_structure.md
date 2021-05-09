@@ -11,8 +11,9 @@ Tx, Rx: Pad, Bunker
 | Byte # | Description |
 |--|--|
 | 0 | Start of packet indicator (some single character). For now, `s` for "start". |
-| 1 | Size of packet's data in bytes (an 8-bit integer, which has range 0-255 in values). This can be increased very easily if we have packets down the road that could be larger than 255 bytes. |
-| 2+ | Packet's raw data |
+| 1 | Data validity information, where each individual bit specifies whether or not a particular datastream's data value is valid (`1` == valid, `0` == invalid). Data may be invalidated due to either the sensor not being able to be polled from or errors in the Arduino script. |
+| 2 | Size of packet's data in bytes (an 8-bit integer, which has range 0-255 in values). This can be increased very easily if we have packets down the road that could be larger than 255 bytes. |
+| 3+ | Packet's raw data |
 
 ### Controls
 
