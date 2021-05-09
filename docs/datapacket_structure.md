@@ -6,8 +6,7 @@ We provide the datapacket structure for our system's below, where each system ob
 
 ### DAQ
 
-Transmission: Pad
-Reception: Bunker
+Tx, Rx: Pad, Bunker
 
 | Byte # | Description |
 |--|--|
@@ -17,8 +16,7 @@ Reception: Bunker
 
 ### Controls
 
-Transmission: Bunker
-Reception: Pad
+Tx, Rx: Bunker, Pad
 
 | Byte # | Description |
 |--|--|
