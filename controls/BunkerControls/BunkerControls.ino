@@ -40,7 +40,7 @@
 SoftwareSerial to_pad_connection(3, 2); // RX, TX
 
 // init `sig` to represent state of switches
-int sig = 0; // since NUM_OF_SIGNALS smaller than 32, this will work fine (4 bytes, 32 bits => at most 32 signals); should this number ever increase, we can use a bigger datatype (like long)
+int sig = 0; // since NUM_OF_SIGNALS smaller than 16, this will work fine (2 bytes, 16 bits => at most 16 signals); should this number ever increase, we can use a bigger datatype (like long, 4 bytes)
 
 void setup()
 {
