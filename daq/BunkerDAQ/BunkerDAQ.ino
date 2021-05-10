@@ -29,6 +29,7 @@
 
 // link necessary libraries
 #include <SoftwareSerial.h>
+#include <CRC32.h>
 
 // init Software Serial connection from pad
 SoftwareSerial from_pad_connection(3, 2); // RX, TX
@@ -38,6 +39,8 @@ float buf[DATA_BUF_SIZE];
 unsigned long timestamp;
 int valid; // since our total number of sensors is smaller than 16, this will work fine (2 bytes, 16 bits => at most 16 signals); should this number ever increase, we can use a bigger datatype (like long, 4 bytes)
 int data_size;
+unsigned long received_checksum;
+CRC32 checksum;
 
 void setup()
 {
@@ -60,15 +63,28 @@ void loop()
   {
     // read metadata information (refer to `https://github.com/UCLA-Rocket-Project/prometheus-groundsys-2021/blob/main/docs/datapacket_structure.md`)
     valid = from_pad_connection.read(); // safe, as we expect only 1 byte transmitted for valid field
-    // checksum = (int) from_pad_connection.parseInt();
     data_size = from_pad_connection.read(); // safe, as we expect only 1 byte transmitted for size field
 
-    // read timestamp
+    // read timestamp (and update checksum)
     timestamp = (unsigned long) from_pad_connection.parseInt();
+    checksum.update(timestamp);
 
-    // read and parse rest of data (floats)
+    // read/parse rest of data (floats), and update checksum
     for (int i = 0; i < data_size-1; i++) // -1 from timestamp already processed
+    {
       buf[i] = from_pad_connection.parseFloat();
+      checksum.update(buf[i]);
+    }
+
+    // read datapackets' sent checksum
+    received_checksum = (unsigned long) from_pad_connection.parseInt();
+
+    // confirm checksum
+    if (received_checksum != checksum.finalize())
+    {
+      // ...do something...
+      Serial.print("CHECKSUM MISMATCH: ")
+    }
 
     // format and display data to Serial monitor
     Serial.print(valid, BIN);
@@ -98,6 +114,8 @@ void reset_buffers()
   timestamp = 0;
   valid = 0;
   data_size = 0;
+  received_checksum = 0;
+  checksum.reset();
 
   // clear data buffer
   for (int i = 0; i < DATA_BUF_SIZE; i++)

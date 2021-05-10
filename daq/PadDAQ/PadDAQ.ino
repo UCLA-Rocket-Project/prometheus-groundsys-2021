@@ -37,6 +37,7 @@ const float PT_SCALE[NUM_OF_PT] = {244.58, 178.51};
 
 // link necessary libraries
 #include <SoftwareSerial.h>
+#include <CRC32.h>
 
 // init SoftwareSerial connection to bunker
 SoftwareSerial to_bunker_connection(4, 8); // RX, TX
@@ -52,6 +53,7 @@ struct Data
 Data buf[DATA_BUF_SIZE];
 unsigned long timestamp;
 int valid; // since our total number of sensors is smaller than 16, this will work fine (2 bytes, 16 bits => at most 16 signals); should this number ever increase, we can use a bigger datatype (like long, 4 bytes)
+CRC32 checksum;
 
 void setup()
 {
@@ -79,12 +81,16 @@ void loop()
   update_valid(&valid, pt_data, 1, F_PT1); // PT1
 
   // compute data checksum
-  // checksum = get_checksum();
+  checksum.update(timestamp);
+
+  for (int i = 0; i < DATA_BUF_SIZE; i++)
+  {
+    checksum.update(buf[i]);
+  }
 
   // send metadata portion of datapacket
   to_bunker_connection.write('s'); // indicate start of transmission
   to_bunker_connection.write(valid); // send byte of data validity information
-  // to_bunker_connection.print(checksum); // send checksum
   to_bunker_connection.write(DATA_BUF_SIZE + 1); // send single byte representing number of floats (data) transmitted (+ 1 for timestamp)
 
   // send data portion of datapacket
@@ -95,6 +101,13 @@ void loop()
     to_bunker_connection.print(',');
     to_bunker_connection.print(buf[i].data); // send single float of data
   }
+
+  // send checksum
+  to_bunker_connection.print(',');
+  to_bunker_connection.print(checksum.finalize());
+
+  // terminate this datapacket
+  to_bunker_connection.println();
 
   // output to Serial debugging information
   if (DEBUGGING)
@@ -141,6 +154,7 @@ void reset_buffers()
 {
   timestamp = 0;
   valid = 0;
+  checksum.reset();
 
   // invalidate data buffer (no need to reset data field since we've invalidated it)
   for (int i = 0; i < DATA_BUF_SIZE; i++)
