@@ -88,6 +88,11 @@ void loop()
   delay(DELAY_RX);
 }
 
+/*
+ * reset_buffers()
+ * -------------------------
+ * Resets all used global data buffers to 0.
+ */
 void reset_buffers()
 {
   timestamp = 0;

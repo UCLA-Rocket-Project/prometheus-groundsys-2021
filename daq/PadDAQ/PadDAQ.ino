@@ -112,6 +112,19 @@ void loop()
   delay(DELAY_TX);
 }
 
+/*
+ * update_valid()
+ * -------------------------
+ * Update inputed valid signal `valid_sig` with specified encoding
+ * `valid_encoding` if `Data` instance at index `i` in buffer `buf`
+ * is valid (member == true). Otherwise, do nothing.
+ * 
+ * Inputs:
+ *   - valid_sig: pointer to integer representing valid signal transmitted
+ *   - buf: `Data` buffer to lookup into
+ *   - i: index of `Data` instance to analyze
+ *   - valid_encoding: bitmask encoding for valid signal for particular data entry
+ */
 void update_valid(int* valid_sig, Data* buf, int i, int valid_encoding)
 {
   // check if data is valid
@@ -119,6 +132,11 @@ void update_valid(int* valid_sig, Data* buf, int i, int valid_encoding)
     (*valid_sig) |= valid_encoding;
 }
 
+/*
+ * reset_buffers()
+ * -------------------------
+ * Resets all used global data buffers to 0 (and/or false).
+ */
 void reset_buffers()
 {
   timestamp = 0;
@@ -137,8 +155,9 @@ void reset_buffers()
  * 
  * Inputs:
  *   - raw_data: integer representing raw voltage reading from PT
+ *   - pt_num: integer representing index number of PT (0 to NUM_OF_PT)
  * 
- * Returns: float representing pressure (in PSI) corresponding to PT reading
+ * Returns: `Data` instance, containing float representing pressure (in PSI) corresponding to PT reading
  */
 Data get_psi_from_raw_pt_data(int raw_data, int pt_num)
 {
