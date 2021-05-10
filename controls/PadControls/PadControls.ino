@@ -36,6 +36,7 @@
 
 // link necessary libraries
 #include <SoftwareSerial.h>
+#include <CRC32.h>
 
 // init SoftwareSerial connection from bunker
 SoftwareSerial from_bunker_connection(3, 2); // RX, TX
@@ -46,6 +47,9 @@ int prev_sig = 0;
 int sig = 0;
 int sig_run_count = 0;
 int cur_state = 0;
+
+unsigned long received_checksum;
+CRC32 checksum;
 
 void setup()
 {
@@ -73,69 +77,89 @@ void loop()
   // only attempt to read data from connection if data is available and the first byte indicates the start of a packet we expect ('s')
   if (from_bunker_connection.read() == 's')
   {
-    // second byte of packet represents our data size
+    // next byte of packet represents our data size
     data_size = from_bunker_connection.read();
 
     prev_sig = sig; // propogate backward the previous signal state
     sig = 0; // setup buffer to hold incoming signal state
+    received_checksum = 0; // setup buffer to hold incoming data checksum
+    checksum.reset(); // reset checksum computer object
 
     // read all data for this packet
     for (int i = 0; i < data_size; i++)
       sig += from_bunker_connection.read() >> (i << 3); // --> i*8 but ~optimized~
 
-    // handle received signal if attempting to change from current state
-    if (sig != cur_state)
+    // compute checksum with received signal
+    checksum.update(sig);
+
+    // final couple of bytes compose datapacket's associated checksum
+    received_checksum = (unsigned long) from_bunker_connection.parseInt();
+
+    // confirm checksum
+    if (received_checksum != checksum.finalize())
     {
-      // check if continuing previous run
-      if (sig == prev_sig)
+      // skip analyzing this signal (output DEBUGGING information, if specified)
+      if (DEBUGGING)
       {
-        // increment run count, and check if reached threshold of state change
-        sig_run_count++;
-        
-        if (sig_run_count >= STATE_CHANGE_SIG_RUN_THRESHOLD)
-        {
-          // analyze all data for this packet
-          analyze_state(sig, SIG_SHUTOFF,     PIN_SHUTOFF);
-          analyze_state(sig, SIG_OX,          PIN_OX);
-          analyze_state(sig, SIG_IGNITE,      PIN_IGNITE);
-          analyze_state(sig, SIG_DISCONNECT,  PIN_DISCONNECT);
-          analyze_state(sig, SIG_VENT,        PIN_VENT);
-          analyze_state(sig, SIG_DUMP,        PIN_DUMP);
-          analyze_state(sig, SIG_NITROGEN,    PIN_NITROGEN);
-          analyze_state(sig, SIG_NITROUS,     PIN_NITROUS);
-
-          // display state change message (with signal decoding if SIG_DECODING set to true)
-          // NOTE: done after analyzing/reacting to data to not delay response time if there's an I/O error
-          if (DEBUGGING)
-          {
-            Serial.print("STATE CHANGED: ");
-            Serial.print(cur_state, BIN);
-            Serial.print(" ---> ");
-            Serial.print(sig, BIN);
-          }
-          
-          if (DEBUGGING)
-          {
-            if (SIG_DECODING)
-            {
-              Serial.print(", corresponds to: ");
-              display_decoded_signals(sig);
-            }
-            else
-              Serial.println();
-          }
-
-          // update current state tracker
-          cur_state = sig;
-
-          // reset run count for next run of a state-changing signal
-          sig_run_count = 1;
-        }
+        Serial.print("CHECKSUM MISMATCH: ")
       }
-      else // if not continuing prevous run...
+    }
+    else // checksum matches, so let's analyze the signal...
+    {
+      // handle received signal if attempting to change from current state
+      if (sig != cur_state)
       {
-        // restart run counter, as we've encountered a new signal (different from previous)
-        sig_run_count = 1; // start at 1 to account for first of next signal appearing
+        // check if continuing previous run
+        if (sig == prev_sig)
+        {
+          // increment run count, and check if reached threshold of state change
+          sig_run_count++;
+          
+          if (sig_run_count >= STATE_CHANGE_SIG_RUN_THRESHOLD)
+          {
+            // analyze all data for this packet
+            analyze_state(sig, SIG_SHUTOFF,     PIN_SHUTOFF);
+            analyze_state(sig, SIG_OX,          PIN_OX);
+            analyze_state(sig, SIG_IGNITE,      PIN_IGNITE);
+            analyze_state(sig, SIG_DISCONNECT,  PIN_DISCONNECT);
+            analyze_state(sig, SIG_VENT,        PIN_VENT);
+            analyze_state(sig, SIG_DUMP,        PIN_DUMP);
+            analyze_state(sig, SIG_NITROGEN,    PIN_NITROGEN);
+            analyze_state(sig, SIG_NITROUS,     PIN_NITROUS);
+
+            // display state change message (with signal decoding if SIG_DECODING set to true)
+            // NOTE: done after analyzing/reacting to data to not delay response time if there's an I/O error
+            if (DEBUGGING)
+            {
+              Serial.print("STATE CHANGED: ");
+              Serial.print(cur_state, BIN);
+              Serial.print(" ---> ");
+              Serial.print(sig, BIN);
+            }
+            
+            if (DEBUGGING)
+            {
+              if (SIG_DECODING)
+              {
+                Serial.print(", corresponds to: ");
+                display_decoded_signals(sig);
+              }
+              else
+                Serial.println();
+            }
+
+            // update current state tracker
+            cur_state = sig;
+
+            // reset run count for next run of a state-changing signal
+            sig_run_count = 1;
+          }
+        }
+        else // if not continuing prevous run...
+        {
+          // restart run counter, as we've encountered a new signal (different from previous)
+          sig_run_count = 1; // start at 1 to account for first of next signal appearing
+        }
       }
     }
 
