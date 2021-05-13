@@ -18,22 +18,33 @@
 #define F_PT1 0b00000010 //2
 //#define F_OTHER 0b00000100 //4
 
-// calibration factors
-const float PT_OFFSET[NUM_OF_PT] = {-209.38, 11.924};
-const float PT_SCALE[NUM_OF_PT] = {244.58, 178.51};
-
 // configurable parameters
 #define DEBUGGING false
 #define BAUD_RATE 57600 // bits per second being transmitted
-#define OFFSET_DELAY_TX 0 // specify additional flat "delay" added to minimum calculated delay to avoid corruption
+#define OFFSET_DELAY_TX 25 // specify additional flat "delay" added to minimum calculated delay to avoid corruption
+#define SERIAL_TRANSFER_TIMEOUT 50
+#define SERIAL_TRANSFER_DEBUGGING true
 #define NUM_OF_PT 2
 #define NUM_OF_TC 0
 #define NUM_OF_LC 0
+
+/* NOTES:
+ *  - TX_DELAY, the lower it is, leads to more often CRC errors, and eventually stale packet issues
+ *  - 25 ms seems to be not bad, with the default TIMEOUT value (50)
+ *  - TIMEOUT is used to determine a timeout threshold for parsing a datapacket from the Serial connection
+ *     - if timeout too short for the length of packet, then will repeatedly cause "ERROR: STALE PACKET"
+ *  - errors in datastream of the form of "ERROR: ..."; this CAN be disabled, but we should probably leave as is so we can do easy debugging
+ */
+
 
 // macros
 #define MIN_DELAY_TX (1/(BAUD_RATE/10))*1000*2 // refer to `https://github.com/UCLA-Rocket-Project/prometheus-groundsys-2021/blob/main/docs/safer_serial_transmission_practices.md`
 #define DELAY_TX MIN_DELAY_TX + OFFSET_DELAY_TX
 #define DATA_BUF_SIZE NUM_OF_PT*1 + NUM_OF_TC*0 + NUM_OF_LC*0
+
+// calibration factors
+const float PT_OFFSET[NUM_OF_PT] = {-209.38, 11.924};
+const float PT_SCALE[NUM_OF_PT] = {244.58, 178.51};
 
 // link necessary libraries
 #include <SerialTransfer.h>
@@ -64,7 +75,7 @@ void setup()
 {
   // start Serial connections
   to_bunker_connection.begin(BAUD_RATE);
-  transfer_to_bunker.begin(to_bunker_connection);
+  transfer_to_bunker.begin(to_bunker_connection, SERIAL_TRANSFER_DEBUGGING, Serial, SERIAL_TRANSFER_TIMEOUT);
   transfer_to_bunker.reset();
 
   if (DEBUGGING)
@@ -76,7 +87,7 @@ void setup()
 void loop()
 {
   // reset data buffers
-  reset_buffers();
+  reset_buffers(dp);
 
   // poll data, preprocess (if needed), and store in datapacket
   dp.timestamp = millis();
@@ -130,7 +141,7 @@ void update_valid(int valid_encoding)
  * -------------------------
  * Resets all used global data buffers to 0 (and/or false).
  */
-void reset_buffers()
+void reset_buffers(Datapacket& dp)
 {
   dp.timestamp = 0;
   dp.valid = 0;

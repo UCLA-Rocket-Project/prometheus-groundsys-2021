@@ -68,7 +68,7 @@ void setup()
 void loop()
 {
   // reset data buffers
-  reset_buffers();
+  reset_buffers(dp);
 
   // only attempt to read data from connection if data is available
   if (transfer_from_pad.available())
@@ -89,7 +89,7 @@ void loop()
  * -------------------------
  * Resets all fields of global data buffer to 0.
  */
-void reset_buffers(const Datapacket& dp)
+void reset_buffers(Datapacket& dp)
 {
   dp.timestamp = 0;
   dp.valid = 0;
