@@ -4,11 +4,6 @@
  * BunkerDAQ
  */
 
-// buffer index
-#define ID_PT0 0
-#define ID_PT1 1
-//#define ID_OTHER 2
-
 // validity flag encodings
 #define F_PT0 0b00000001 //1
 #define F_PT1 0b00000010 //2
@@ -18,14 +13,10 @@
 #define DEBUGGING true
 #define BAUD_RATE 57600 // bits per second being transmitted
 #define OFFSET_DELAY_RX 0 // specify additional flat "delay" added to minimum calculated (for transmitting)
-#define NUM_OF_PT 2
-#define NUM_OF_TC 0
-#define NUM_OF_LC 0
 
 // macros
 #define MIN_DELAY_TX (1/(BAUD_RATE/10))*1000*2 // refer to `https://github.com/UCLA-Rocket-Project/prometheus-groundsys-2021/blob/main/docs/safer_serial_transmission_practices.md`
 #define DELAY_RX MIN_DELAY_TX + OFFSET_DELAY_RX // minimum delay needed by TX end, but this generally is a good rule-of-thumb for receiving end as well :)
-#define DATA_BUF_SIZE NUM_OF_PT*1 + NUM_OF_TC*0 + NUM_OF_LC*0
 
 // link necessary libraries
 #include <SerialTransfer.h>

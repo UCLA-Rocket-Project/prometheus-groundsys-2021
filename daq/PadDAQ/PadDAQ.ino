@@ -8,11 +8,6 @@
 #define PIN_PT0 A0
 #define PIN_PT1 A1
 
-// buffer index
-#define ID_PT0 0
-#define ID_PT1 1
-//#define ID_OTHER 2
-
 // validity flag encodings
 #define F_PT0 0b00000001 //1
 #define F_PT1 0b00000010 //2
@@ -40,7 +35,6 @@
 // macros
 #define MIN_DELAY_TX (1/(BAUD_RATE/10))*1000*2 // refer to `https://github.com/UCLA-Rocket-Project/prometheus-groundsys-2021/blob/main/docs/safer_serial_transmission_practices.md`
 #define DELAY_TX MIN_DELAY_TX + OFFSET_DELAY_TX
-#define DATA_BUF_SIZE NUM_OF_PT*1 + NUM_OF_TC*0 + NUM_OF_LC*0
 
 // calibration factors
 const float PT_OFFSET[NUM_OF_PT] = {-209.38, 11.924};
@@ -62,7 +56,7 @@ struct Datapacket
   // metadata
   int valid;
 
-  // data-portion
+  // data portion
   unsigned long timestamp;
   float pt0_data;
   float pt1_data;
