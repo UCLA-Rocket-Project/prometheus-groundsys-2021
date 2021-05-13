@@ -1,4 +1,5 @@
 
+
 # Safer Serial Transmission Practices
 
 During Prometheus' Hot-Fire of the hybrid rocket system on May 1st, 2021, due to issues with data transmission that arose during initial checks, a simplified and bare-bones version of the complete DAQ system was utilized.
@@ -78,8 +79,6 @@ In order to ensure a clear unambiguous separation between datapackets, we seek t
 
 We note that in contexts where we are polling from sensors (perhaps through an API provided by a library), we should likely populate the datapacket with null values accordingly to ensure accurate decoding.
 
-For a detailed description of the current datapacket structure's employed for Prometheus' Ground Systems, please refer to the official [Datapacket Structure document](datapacket_structure.md).
-
 ## Checksum
 
 A checksum is a relatively smaller-sized piece of data generated through a checksum function or algorithm, where the input is that of some raw data that it intends to verify after its transmission.  
@@ -96,6 +95,10 @@ When changing the state of any critical systems (such as that of our Pad Control
 One very simple precaution that can be employed is confirming that the data received properly reflects the signal sent multiple times before shifting state. In a one-way communication system, this can be done by having the transmitting system continually transmit a signal, while having the receiving system only shift to a  pre-determined critical state when receiving the same signal `X` number of times, where this `X` represents some user-defined threshold.
 
 This system is currently adopted in Prometheus' Controls subsystem code, due to the occasional presence of some likely hardware-induced erroneous signals over our Serial communication line.
+
+## Solutions Currently Adopted
+
+Given the aforementioned considerations, our current ground systems software adopts the majority of these practices in both our DAQ and Controls subsystems. For more information on how this is done, refer to the [Serial Communication Methods document](serial_communication_methods.md).
 
 ## Author Notes
 This document was compiled by Harrison Cassar, Class of 2022, in May of 2021. For any questions, feel free to directly message Harrison over Slack.
