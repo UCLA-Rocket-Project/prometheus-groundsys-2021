@@ -5,8 +5,8 @@
  */
 
 // pin numbers
-#define PIN_PT0 A0
-#define PIN_PT1 A1
+#define PIN_PT0 A5
+#define PIN_PT1 A0
 
 // validity flag encodings
 #define F_PT0 0b00000001 //1
