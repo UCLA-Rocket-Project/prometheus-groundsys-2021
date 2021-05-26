@@ -1,0 +1,141 @@
+classdef app1 < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure  matlab.ui.Figure
+        LCPlot    matlab.ui.control.UIAxes
+        PT2Plot   matlab.ui.control.UIAxes
+        PT1Plot   matlab.ui.control.UIAxes
+    end
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function AppStart(app)
+            jj = 1;
+            s = serialport("/dev/cu.usbmodem142201", 9600);
+            %xlim(app.PT1Plot,[-10,0])
+            %ylim(app.PT1Plot,[0,1000]) % limit what comes in on the y axis
+            while 1
+                drawnow
+                if s.NumBytesAvailable > 0
+                    RawDataBlock = read(s,s.NumBytesAvailable,'char');
+                end
+                flush(s,"input")
+                
+                DataStrs = strtrim(split(RawDataBlock,newline));
+                if length(DataStrs) > 1
+                    LastDataStr = split(DataStrs(end-1),',');
+                else
+                    LastDataStr = split(DataStrs(end),',');
+                end
+            
+                CurrTime = str2double(LastDataStr{1})*10^-3;
+                
+                 for k = 2:1:length(DataStrs)
+                    DataLine = split(DataStrs{k},',');
+                    TimeArr(jj) = str2double(DataLine{1})*10^-3;
+                    RawStrs = str2double(DataLine);
+                    %SumChanStr = sum(RawStrs(1:end-1));
+                
+                    %if str2double(DataLine(end)) ~= SumChanStr
+                    if str2double(DataLine(end)) ~= -42069
+                        k = k + 1;
+                     else
+                        for kk = 2:1:length(DataLine)-1     % only look at middle values (ignore current time and sum)
+                            ChanRawData(jj,kk - 1) = str2double(DataLine{kk});
+                            ChanData(jj,kk - 1) = ChanRawData(jj,kk - 1);
+                            
+                            %ChanData(jj,kk - 1) = (ChanRawData(jj,kk - 1)+app.CaliArrMapped(kk-1,2))/app.CaliArrMapped(kk-1,1);
+                        end
+                    
+                    jj = jj + 1;
+                    end
+                 end
+                
+                jjj = jj - 1;
+                
+                TimeRelArr = TimeArr(1:jjj) - CurrTime;
+                zz = find(TimeRelArr > -10,1,'first');      % seconds to plot over, rn 30
+                
+                if isempty(zz)
+                    zz = 1;
+                end
+                
+                %% PLOTTING
+                plot(app.PT1Plot,TimeRelArr(zz:jjj),ChanData(zz:jjj,1))     % change 1 to other channel numbers
+                plot(app.PT2Plot,TimeRelArr(zz:jjj),ChanData(zz:jjj,2)) 
+                plot(app.LCPlot,TimeRelArr(zz:jjj),ChanData(zz:jjj,3)) 
+            end
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Position = [100 100 640 480];
+            app.UIFigure.Name = 'MATLAB App';
+
+            % Create PT1Plot
+            app.PT1Plot = uiaxes(app.UIFigure);
+            title(app.PT1Plot, 'PT1')
+            xlabel(app.PT1Plot, 'X')
+            ylabel(app.PT1Plot, 'Y')
+            zlabel(app.PT1Plot, 'Z')
+            app.PT1Plot.Position = [39 256 300 185];
+
+            % Create PT2Plot
+            app.PT2Plot = uiaxes(app.UIFigure);
+            title(app.PT2Plot, 'PT2')
+            xlabel(app.PT2Plot, 'X')
+            ylabel(app.PT2Plot, 'Y')
+            zlabel(app.PT2Plot, 'Z')
+            app.PT2Plot.Position = [39 48 300 185];
+
+            % Create LCPlot
+            app.LCPlot = uiaxes(app.UIFigure);
+            title(app.LCPlot, 'LC')
+            xlabel(app.LCPlot, 'X')
+            ylabel(app.LCPlot, 'Y')
+            zlabel(app.LCPlot, 'Z')
+            app.LCPlot.Position = [338 256 300 185];
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = app1
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            runStartupFcn(app, @AppStart)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end
