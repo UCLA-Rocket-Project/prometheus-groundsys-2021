@@ -66,6 +66,9 @@ struct Datapacket
   float pt0_data;
   float pt1_data;
   float lc_data;
+
+  // data checksum
+  float checksum;
 };
 
 // init buffer for datapacket
@@ -95,10 +98,13 @@ void loop()
   dp.pt1_data = get_psi_from_raw_pt_data(analogRead(PIN_PT1), 1);
   dp.lc_data = get_lbf_from_raw_lc_data(analogRead(PIN_LC));
 
+  // compute and update checksum
+  update_checksum(dp);
+
   // properly update valid flags in datapacket's metadata
-  update_valid(F_PT0); // PT0
-  update_valid(F_PT1); // PT1
-  update_valid(F_LC); // LC
+  update_valid(dp, F_PT0); // PT0
+  update_valid(dp, F_PT1); // PT1
+  update_valid(dp, F_LC); // LC
 
   // transmit packet
   transfer_to_bunker.sendDatum(dp);
@@ -134,7 +140,7 @@ void loop()
  *   - i: index of `Data` instance to analyze
  *   - valid_encoding: bitmask encoding for valid signal for particular data entry
  */
-void update_valid(int valid_encoding)
+void update_valid(Datapacket& dp, int valid_encoding)
 {
   // check if data is valid
   dp.valid |= valid_encoding;
@@ -195,4 +201,9 @@ float get_lbf_from_raw_lc_data(int raw_data)
 
   // return value
   return lbf;
+}
+
+void update_checksum(Datapacket& dp)
+{
+  dp.checksum = dp.pt0_data + dp.pt1_data + dp.lc_data;
 }
