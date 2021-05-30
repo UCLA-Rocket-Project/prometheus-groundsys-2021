@@ -7,7 +7,8 @@
 // validity flag encodings
 #define F_PT0 0b00000001 //1
 #define F_PT1 0b00000010 //2
-//#define F_OTHER 0b00000100 //4
+#define F_LC  0b00000100 //4
+//#define F_OTHER 0b00001000 //8
 
 // configurable parameters
 #define DEBUGGING true
@@ -38,6 +39,10 @@ struct Datapacket
   unsigned long timestamp;
   float pt0_data;
   float pt1_data;
+  float lc_data;
+
+  // data checksum
+  float checksum;
 };
 
 // init buffer for datapacket
@@ -86,6 +91,8 @@ void reset_buffers(Datapacket& dp)
   dp.valid = 0;
   dp.pt0_data = 0;
   dp.pt1_data = 0;
+  dp.lc_data = 0;
+  dp.checksum = 0;
 }
 
 /*
@@ -95,11 +102,13 @@ void reset_buffers(Datapacket& dp)
  */
 void display_dp(const Datapacket& dp)
 {
-  Serial.print(dp.valid, BIN);
-  Serial.print(',');
   Serial.print(dp.timestamp);
   Serial.print(',');
   Serial.print(dp.pt0_data);
   Serial.print(',');
-  Serial.println(dp.pt1_data);
+  Serial.print(dp.pt1_data);
+  Serial.print(',');
+  Serial.print(dp.lc_data);
+  Serial.print(',');
+  Serial.println(dp.checksum);
 }

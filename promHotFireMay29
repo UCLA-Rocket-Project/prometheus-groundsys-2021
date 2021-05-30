@@ -1,0 +1,272 @@
+classdef promHotFireMay29 < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure         matlab.ui.Figure
+        Label            matlab.ui.control.Label
+        FIRELabel        matlab.ui.control.Label
+        HOTLabel         matlab.ui.control.Label
+        PROMETHEUSLabel  matlab.ui.control.Label
+        LCtext           matlab.ui.control.TextArea
+        LOADCELLLabel    matlab.ui.control.Label
+        PT2text          matlab.ui.control.TextArea
+        PT2Label         matlab.ui.control.Label
+        PT1text          matlab.ui.control.TextArea
+        PT1Label         matlab.ui.control.Label
+        Switch           matlab.ui.control.Switch
+        LCPlot           matlab.ui.control.UIAxes
+        PT2Plot          matlab.ui.control.UIAxes
+        PT1Plot          matlab.ui.control.UIAxes
+    end
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function AppStart(app)
+
+            jj = 1;
+            s = serialport("/dev/cu.usbmodem144301", 9600);
+            ylim(app.PT1Plot,[0,1000]) % limit what comes in on the y axis
+            ylim(app.PT2Plot,[0,1000]) % limit what comes in on the y axis
+            ylim(app.LCPlot,[0,1000]) % limit what comes in on the y axis
+            ChanRawData = [];
+            ChanData = [];
+            fileID = fopen("CHANGETHIS.txt", 'W');
+           
+            TimeArr = [];
+            ChanRawData = [];
+            ChanData = [];
+            RawDataBlock = ['0,0,0,0,0,0,0,0,0,0,0,0,0' newline '0,0,0,0,0,0,0,0,0,0,0,0,0' newline '0,0,0,0,0,0,0,0,0,0,0,0,0'];
+            
+            while app.Switch.Value == 'On'
+                
+                drawnow
+                if s.NumBytesAvailable > 0
+                    RawDataBlock = read(s,s.NumBytesAvailable,'char');
+                    fprintf(fileID, RawDataBlock);
+
+                end
+                flush(s,"input")
+                
+                DataStrs = strtrim(split(RawDataBlock,newline));
+                if length(DataStrs) > 1
+                    LastDataStr = split(DataStrs(end-1),',');
+                else
+                    LastDataStr = split(DataStrs(end),',');
+                end
+            
+                CurrTime = str2double(LastDataStr{1})*10^-3;
+                
+                for k = 2:1:length(DataStrs)
+                    
+                    DataLine = split(DataStrs{k},',');
+                    
+                    % Printing the PT, LC values in text boxes
+                    try 
+                        app.PT1text.Value = DataLine{2}
+                    catch ME
+                        continue;
+                    end
+                    
+                    try 
+                        app.PT2text.Value = DataLine{3}
+                    catch ME
+                        continue;
+                    end
+
+                    try 
+                        app.LCtext.Value = DataLine{4}
+                    catch ME
+                        continue;
+                    end
+                    
+                    TimeArr(jj) = str2double(DataLine{1})*10^-3;
+                    RawStrs = str2double(DataLine);
+
+                    if str2double(DataLine(end)) ~= -42069
+                        k = k + 1;
+                    else
+                        for kk = 2:1:length(DataLine)-1     % only look at middle values (ignore current time and sum)
+                            ChanRawData(jj,kk - 1) = str2double(DataLine{kk});
+                            ChanData(jj,kk - 1) = ChanRawData(jj,kk - 1);
+                        end
+                    jj = jj + 1;
+                    end 
+                    
+                end
+                jjj = jj - 1;
+                
+                TimeRelArr = TimeArr(1:jjj) - CurrTime;
+                zz = find(TimeRelArr > -10000,1,'first');      % seconds to plot over, rn 30
+                
+                if isempty(zz)
+                    zz = 1;
+                end
+                
+                try 
+                    plot(app.PT1Plot, TimeRelArr(zz:jjj), ChanData(zz:jjj,1))     % change 1 to other channel numbers
+                    %app.PT1text.Value = ChanData(zz:jjj,1)
+                catch ME
+                    continue;
+                end
+                try 
+                    plot(app.PT2Plot, TimeRelArr(zz:jjj), ChanData(zz:jjj,2)) 
+                catch ME
+                    continue;
+                end
+                try 
+                    plot(app.LCPlot, TimeRelArr(zz:jjj), ChanData(zz:jjj,3)) 
+                catch ME
+                    continue;
+                end
+               
+            end
+        end
+
+        % Value changed function: Switch
+        function switchValue(app, event)
+
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Position = [100 100 736 538];
+            app.UIFigure.Name = 'MATLAB App';
+
+            % Create PT1Plot
+            app.PT1Plot = uiaxes(app.UIFigure);
+            title(app.PT1Plot, 'PT1')
+            xlabel(app.PT1Plot, 'X')
+            ylabel(app.PT1Plot, 'Y')
+            zlabel(app.PT1Plot, 'Z')
+            app.PT1Plot.Position = [40 289 300 185];
+
+            % Create PT2Plot
+            app.PT2Plot = uiaxes(app.UIFigure);
+            title(app.PT2Plot, 'PT2')
+            xlabel(app.PT2Plot, 'X')
+            ylabel(app.PT2Plot, 'Y')
+            zlabel(app.PT2Plot, 'Z')
+            app.PT2Plot.Position = [41 86 300 185];
+
+            % Create LCPlot
+            app.LCPlot = uiaxes(app.UIFigure);
+            title(app.LCPlot, 'LC')
+            xlabel(app.LCPlot, 'X')
+            ylabel(app.LCPlot, 'Y')
+            zlabel(app.LCPlot, 'Z')
+            app.LCPlot.Position = [373 289 300 185];
+
+            % Create Switch
+            app.Switch = uiswitch(app.UIFigure, 'slider');
+            app.Switch.ValueChangedFcn = createCallbackFcn(app, @switchValue, true);
+            app.Switch.Position = [97 28 74 33];
+            app.Switch.Value = 'On';
+
+            % Create PT1Label
+            app.PT1Label = uilabel(app.UIFigure);
+            app.PT1Label.HorizontalAlignment = 'right';
+            app.PT1Label.Position = [411 237 30 22];
+            app.PT1Label.Text = 'PT 1';
+
+            % Create PT1text
+            app.PT1text = uitextarea(app.UIFigure);
+            app.PT1text.Position = [411 202 101 27];
+
+            % Create PT2Label
+            app.PT2Label = uilabel(app.UIFigure);
+            app.PT2Label.HorizontalAlignment = 'right';
+            app.PT2Label.Position = [411 161 30 22];
+            app.PT2Label.Text = 'PT 2';
+
+            % Create PT2text
+            app.PT2text = uitextarea(app.UIFigure);
+            app.PT2text.Position = [415 126 101 27];
+
+            % Create LOADCELLLabel
+            app.LOADCELLLabel = uilabel(app.UIFigure);
+            app.LOADCELLLabel.HorizontalAlignment = 'right';
+            app.LOADCELLLabel.Position = [411 87 70 22];
+            app.LOADCELLLabel.Text = 'LOAD CELL';
+
+            % Create LCtext
+            app.LCtext = uitextarea(app.UIFigure);
+            app.LCtext.Position = [415 52 101 27];
+
+            % Create PROMETHEUSLabel
+            app.PROMETHEUSLabel = uilabel(app.UIFigure);
+            app.PROMETHEUSLabel.FontName = 'Comic Sans MS';
+            app.PROMETHEUSLabel.FontSize = 30;
+            app.PROMETHEUSLabel.FontWeight = 'bold';
+            app.PROMETHEUSLabel.FontColor = [1 0 1];
+            app.PROMETHEUSLabel.Position = [41 483 230 46];
+            app.PROMETHEUSLabel.Text = 'PROMETHEUS ';
+
+            % Create HOTLabel
+            app.HOTLabel = uilabel(app.UIFigure);
+            app.HOTLabel.FontName = 'Comic Sans MS';
+            app.HOTLabel.FontSize = 30;
+            app.HOTLabel.FontWeight = 'bold';
+            app.HOTLabel.FontColor = [1 0 0];
+            app.HOTLabel.Position = [259 483 73 46];
+            app.HOTLabel.Text = 'HOT';
+
+            % Create FIRELabel
+            app.FIRELabel = uilabel(app.UIFigure);
+            app.FIRELabel.FontName = 'Comic Sans MS';
+            app.FIRELabel.FontSize = 30;
+            app.FIRELabel.FontWeight = 'bold';
+            app.FIRELabel.FontColor = [0 1 0];
+            app.FIRELabel.Position = [338 483 78 46];
+            app.FIRELabel.Text = 'FIRE';
+
+            % Create Label
+            app.Label = uilabel(app.UIFigure);
+            app.Label.FontName = 'Comic Sans MS';
+            app.Label.FontSize = 30;
+            app.Label.FontWeight = 'bold';
+            app.Label.FontColor = [0 0 1];
+            app.Label.Position = [424 483 128 46];
+            app.Label.Text = '5/29/21';
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = promHotFireMay29
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            runStartupFcn(app, @AppStart)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end
