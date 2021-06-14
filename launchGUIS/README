@@ -1,1 +1,2 @@
-
+- Worked on the DAQ GUI with Tracy on Monday June 14. Only displays pressure transducer plot and data. Saves all incoming transmissions.
+- Flight GUI seems a little buggy, still working out the kinks. Only displays altimeter data, saves all 14 values + -42069 (15 values total).
