@@ -2,21 +2,21 @@ classdef promHotFireMay29 < matlab.apps.AppBase
 
     % Properties that correspond to app components
     properties (Access = public)
-        UIFigure         matlab.ui.Figure
-        Label            matlab.ui.control.Label
-        FIRELabel        matlab.ui.control.Label
-        HOTLabel         matlab.ui.control.Label
-        PROMETHEUSLabel  matlab.ui.control.Label
-        LCtext           matlab.ui.control.TextArea
-        LOADCELLLabel    matlab.ui.control.Label
-        PT2text          matlab.ui.control.TextArea
-        PT2Label         matlab.ui.control.Label
-        PT1text          matlab.ui.control.TextArea
-        PT1Label         matlab.ui.control.Label
-        Switch           matlab.ui.control.Switch
-        LCPlot           matlab.ui.control.UIAxes
-        PT2Plot          matlab.ui.control.UIAxes
-        PT1Plot          matlab.ui.control.UIAxes
+        UIFigure             matlab.ui.Figure
+        Label                matlab.ui.control.Label
+        FIRELabel            matlab.ui.control.Label
+        HOTLabel             matlab.ui.control.Label
+        PROMETHEUSLabel      matlab.ui.control.Label
+        LCtext               matlab.ui.control.TextArea
+        LOADCELLLabel        matlab.ui.control.Label
+        PT2text              matlab.ui.control.TextArea
+        OxTankLabel          matlab.ui.control.Label
+        PT1text              matlab.ui.control.TextArea
+        GroundPlumbingLabel  matlab.ui.control.Label
+        Switch               matlab.ui.control.Switch
+        LCPlot               matlab.ui.control.UIAxes
+        PT2Plot              matlab.ui.control.UIAxes
+        PT1Plot              matlab.ui.control.UIAxes
     end
 
     % Callbacks that handle component events
@@ -25,14 +25,16 @@ classdef promHotFireMay29 < matlab.apps.AppBase
         % Code that executes after component creation
         function AppStart(app)
 
+            % Data comes in as 
+            
             jj = 1;
-            s = serialport("/dev/cu.usbmodem144301", 9600);
+            s = serialport("/dev/cu.usbmodem144101", 9600);
             ylim(app.PT1Plot,[0,1000]) % limit what comes in on the y axis
             ylim(app.PT2Plot,[0,1000]) % limit what comes in on the y axis
             ylim(app.LCPlot,[0,1000]) % limit what comes in on the y axis
             ChanRawData = [];
             ChanData = [];
-            fileID = fopen("CHANGETHIS.txt", 'W');
+            fileID = fopen("Hotfire1AttemptNone.txt", 'W');
            
             TimeArr = [];
             ChanRawData = [];
@@ -98,7 +100,7 @@ classdef promHotFireMay29 < matlab.apps.AppBase
                 jjj = jj - 1;
                 
                 TimeRelArr = TimeArr(1:jjj) - CurrTime;
-                zz = find(TimeRelArr > -10000,1,'first');      % seconds to plot over, rn 30
+                zz = find(TimeRelArr > -600,1,'first');      % seconds to plot over, rn 30
                 
                 if isempty(zz)
                     zz = 1;
@@ -171,35 +173,38 @@ classdef promHotFireMay29 < matlab.apps.AppBase
             app.Switch.Position = [97 28 74 33];
             app.Switch.Value = 'On';
 
-            % Create PT1Label
-            app.PT1Label = uilabel(app.UIFigure);
-            app.PT1Label.HorizontalAlignment = 'right';
-            app.PT1Label.Position = [411 237 30 22];
-            app.PT1Label.Text = 'PT 1';
+            % Create GroundPlumbingLabel
+            app.GroundPlumbingLabel = uilabel(app.UIFigure);
+            app.GroundPlumbingLabel.HorizontalAlignment = 'right';
+            app.GroundPlumbingLabel.Position = [341 263 100 22];
+            app.GroundPlumbingLabel.Text = 'Ground Plumbing';
 
             % Create PT1text
             app.PT1text = uitextarea(app.UIFigure);
-            app.PT1text.Position = [411 202 101 27];
+            app.PT1text.FontSize = 25;
+            app.PT1text.Position = [411 228 101 27];
 
-            % Create PT2Label
-            app.PT2Label = uilabel(app.UIFigure);
-            app.PT2Label.HorizontalAlignment = 'right';
-            app.PT2Label.Position = [411 161 30 22];
-            app.PT2Label.Text = 'PT 2';
+            % Create OxTankLabel
+            app.OxTankLabel = uilabel(app.UIFigure);
+            app.OxTankLabel.HorizontalAlignment = 'right';
+            app.OxTankLabel.Position = [392 187 49 22];
+            app.OxTankLabel.Text = 'Ox Tank';
 
             % Create PT2text
             app.PT2text = uitextarea(app.UIFigure);
-            app.PT2text.Position = [415 126 101 27];
+            app.PT2text.FontSize = 25;
+            app.PT2text.Position = [415 152 101 27];
 
             % Create LOADCELLLabel
             app.LOADCELLLabel = uilabel(app.UIFigure);
             app.LOADCELLLabel.HorizontalAlignment = 'right';
-            app.LOADCELLLabel.Position = [411 87 70 22];
+            app.LOADCELLLabel.Position = [413 109 70 22];
             app.LOADCELLLabel.Text = 'LOAD CELL';
 
             % Create LCtext
             app.LCtext = uitextarea(app.UIFigure);
-            app.LCtext.Position = [415 52 101 27];
+            app.LCtext.FontSize = 25;
+            app.LCtext.Position = [417 74 101 27];
 
             % Create PROMETHEUSLabel
             app.PROMETHEUSLabel = uilabel(app.UIFigure);
