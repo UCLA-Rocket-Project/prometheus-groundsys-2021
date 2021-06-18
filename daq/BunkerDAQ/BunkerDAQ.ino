@@ -6,8 +6,7 @@
 
 // validity flag encodings
 #define F_PT0 0b00000001 //1
-#define F_PT1 0b00000010 //2
-#define F_LC  0b00000100 //4
+
 //#define F_OTHER 0b00001000 //8
 
 // configurable parameters
@@ -32,14 +31,9 @@ SerialTransfer transfer_from_pad;
 // data packet structure
 struct Datapacket
 {
-  // metadata
-  int valid;
-
-  // data-portion
+  // data portion
   unsigned long timestamp;
   float pt0_data;
-  float pt1_data;
-  float lc_data;
 
   // data checksum
   float checksum;
@@ -88,10 +82,7 @@ void loop()
 void reset_buffers(Datapacket& dp)
 {
   dp.timestamp = 0;
-  dp.valid = 0;
   dp.pt0_data = 0;
-  dp.pt1_data = 0;
-  dp.lc_data = 0;
   dp.checksum = 0;
 }
 
@@ -106,9 +97,5 @@ void display_dp(const Datapacket& dp)
   Serial.print(',');
   Serial.print(dp.pt0_data);
   Serial.print(',');
-  Serial.print(dp.pt1_data);
-  Serial.print(',');
-  Serial.print(dp.lc_data);
-  Serial.print(',');
-  Serial.println(dp.checksum);
+  Serial.println("-42069");
 }

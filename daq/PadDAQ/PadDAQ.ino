@@ -6,14 +6,6 @@
 
 // pin numbers
 #define PIN_PT0 A5
-#define PIN_PT1 A0
-#define PIN_LC A1
-
-// validity flag encodings
-#define F_PT0 0b00000001 //1
-#define F_PT1 0b00000010 //2
-#define F_LC  0b00000100 //4
-//#define F_OTHER 0b00000100 //4
 
 // configurable parameters
 #define DEBUGGING false
@@ -21,9 +13,9 @@
 #define OFFSET_DELAY_TX 25 // specify additional flat "delay" added to minimum calculated delay to avoid corruption
 #define SERIAL_TRANSFER_TIMEOUT 50
 #define SERIAL_TRANSFER_DEBUGGING true
-#define NUM_OF_PT 2
+#define NUM_OF_PT 1
 #define NUM_OF_TC 0
-#define NUM_OF_LC 1
+#define NUM_OF_LC 0
 
 /* NOTES:
  *  - TX_DELAY, the lower it is, leads to more often CRC errors, and eventually stale packet issues
@@ -39,11 +31,8 @@
 #define DELAY_TX MIN_DELAY_TX + OFFSET_DELAY_TX
 
 // calibration factors
-const float PT_OFFSET[NUM_OF_PT] = {-209.38, 11.924};
-const float PT_SCALE[NUM_OF_PT] = {244.58, 178.51};
-
-const float LC_OFFSET = -5.0864;
-const float LC_SCALE = 190.43;
+const float PT_OFFSET[NUM_OF_PT] = {-245.38}; // PT5, PT3: -209.38, 11.924
+const float PT_SCALE[NUM_OF_PT] = {248.41}; // PT5, PT3: 244.58, 178.51
 
 // link necessary libraries
 #include <SerialTransfer.h>
@@ -58,14 +47,9 @@ SerialTransfer transfer_to_bunker;
 // data packet structure
 struct Datapacket
 {
-  // metadata
-  int valid;
-
   // data portion
   unsigned long timestamp;
   float pt0_data;
-  float pt1_data;
-  float lc_data;
 
   // data checksum
   float checksum;
@@ -95,16 +79,9 @@ void loop()
   // poll data, preprocess (if needed), and store in datapacket
   dp.timestamp = millis();
   dp.pt0_data = get_psi_from_raw_pt_data(analogRead(PIN_PT0), 0);
-  dp.pt1_data = get_psi_from_raw_pt_data(analogRead(PIN_PT1), 1);
-  dp.lc_data = get_lbf_from_raw_lc_data(analogRead(PIN_LC));
 
   // compute and update checksum
   update_checksum(dp);
-
-  // properly update valid flags in datapacket's metadata
-  update_valid(dp, F_PT0); // PT0
-  update_valid(dp, F_PT1); // PT1
-  update_valid(dp, F_LC); // LC
 
   // transmit packet
   transfer_to_bunker.sendDatum(dp);
@@ -112,15 +89,9 @@ void loop()
   // output to Serial debugging information
   if (DEBUGGING)
   {
-    Serial.print(dp.valid);
-    Serial.print(',');
     Serial.print(dp.timestamp);
     Serial.print(',');
     Serial.print(dp.pt0_data);
-    Serial.print(',');
-    Serial.print(dp.pt1_data);
-    Serial.print(',');
-    Serial.println(dp.lc_data);
   }
 
   // delay so we don't sample/transmit too fast :)
@@ -140,11 +111,11 @@ void loop()
  *   - i: index of `Data` instance to analyze
  *   - valid_encoding: bitmask encoding for valid signal for particular data entry
  */
-void update_valid(Datapacket& dp, int valid_encoding)
+/*void update_valid(Datapacket& dp, int valid_encoding)
 {
   // check if data is valid
   dp.valid |= valid_encoding;
-}
+}*/
 
 /*
  * reset_buffers()
@@ -154,9 +125,7 @@ void update_valid(Datapacket& dp, int valid_encoding)
 void reset_buffers(Datapacket& dp)
 {
   dp.timestamp = 0;
-  dp.valid = 0;
   dp.pt0_data = 0;
-  dp.pt1_data = 0;
 }
 
 /*
@@ -184,10 +153,10 @@ float get_psi_from_raw_pt_data(int raw_data, int pt_num)
   float psi = voltage*scale + offset; 
 
   // return value
-  return voltage;
+  return psi;
 }
 
-float get_lbf_from_raw_lc_data(int raw_data)
+/*float get_lbf_from_raw_lc_data(int raw_data)
 {
   // get calibration factors for LC
   float offset = LC_OFFSET;
@@ -201,9 +170,9 @@ float get_lbf_from_raw_lc_data(int raw_data)
 
   // return value
   return lbf;
-}
+}*/
 
 void update_checksum(Datapacket& dp)
 {
-  dp.checksum = dp.pt0_data + dp.pt1_data + dp.lc_data;
+  dp.checksum = dp.pt0_data;
 }

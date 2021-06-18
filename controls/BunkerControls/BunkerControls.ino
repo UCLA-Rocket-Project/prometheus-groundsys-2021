@@ -35,14 +35,12 @@
 
 // link necessary libraries
 #include <SoftwareSerial.h>
-#include <CRC32.h>
 
 // init SoftwareSerial connection to pad
 SoftwareSerial to_pad_connection(3, 2); // RX, TX
 
-// init data buffers
+// init `sig` to represent state of switches
 int sig = 0; // since NUM_OF_SIGNALS smaller than 16, this will work fine (2 bytes, 16 bits => at most 16 signals); should this number ever increase, we can use a bigger datatype (like long, 4 bytes)
-CRC32 checksum;
 
 void setup()
 {
@@ -69,7 +67,6 @@ void loop()
 {
   // reset state variable
   sig = 0;
-  checksum.reset();
 
   // update state variable with current state of switches
   update_state(&sig, PIN_SHUTOFF, SIG_SHUTOFF);
@@ -81,9 +78,6 @@ void loop()
   update_state(&sig, PIN_NITROGEN, SIG_NITROGEN);
   update_state(&sig, PIN_NITROUS, SIG_NITROUS);
 
-  // compute checksum
-  checksum.update(sig);
-
   // send metadata portion of datapacket
   to_pad_connection.write('s'); // indicate start of transmission
   to_pad_connection.write(SIGNAL_LENGTH); // send single byte representing size of data transmitted
@@ -91,9 +85,6 @@ void loop()
   // send data portion of datapacket
   for (int i = 0; i < SIGNAL_LENGTH*8; i+=8)
     to_pad_connection.write(sig >> i); // send byte of signal state data
-
-  // send checksum
-  to_pad_connection.println(checksum.finalize());
 
   // output to Serial debugging and signal decoding information
   if (DEBUGGING)
