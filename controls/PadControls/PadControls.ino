@@ -6,17 +6,17 @@
 
 // pin numbers
 #define PIN_SHUTOFF 7
-#define PIN_OX 6
-#define PIN_IGNITE 8
-#define PIN_DISCONNECT 9
-#define PIN_VENT 10
-#define PIN_DUMP 11
-#define PIN_NITROGEN 12
-#define PIN_NITROUS 13
+#define PIN_MPV 6
+#define PIN_IGNITE 13 //8
+#define PIN_DISCONNECT 12 //9
+#define PIN_VENT 11 //10
+#define PIN_DUMP 10 //11
+#define PIN_NITROGEN 9 //12
+#define PIN_NITROUS 8 //13
 
 // control signal flags
 #define SIG_SHUTOFF     0b000000001 //1
-#define SIG_OX          0b000000010 //2
+#define SIG_MPV         0b000000010 //2
 #define SIG_IGNITE      0b000000100 //4
 #define SIG_DISCONNECT  0b000001000 //8
 #define SIG_VENT        0b000010000 //16
@@ -56,7 +56,7 @@ void setup()
   pinMode(PIN_VENT, OUTPUT);
   pinMode(PIN_DISCONNECT, OUTPUT);
   pinMode(PIN_IGNITE, OUTPUT);
-  pinMode(PIN_OX, OUTPUT);
+  pinMode(PIN_MPV, OUTPUT);
   pinMode(PIN_SHUTOFF, OUTPUT);
 
   // start Serial connections
@@ -96,7 +96,7 @@ void loop()
         {
           // analyze all data for this packet
           analyze_state(sig, SIG_SHUTOFF,     PIN_SHUTOFF);
-          analyze_state(sig, SIG_OX,          PIN_OX);
+          analyze_state(sig, SIG_MPV,          PIN_MPV);
           analyze_state(sig, SIG_IGNITE,      PIN_IGNITE);
           analyze_state(sig, SIG_DISCONNECT,  PIN_DISCONNECT);
           analyze_state(sig, SIG_VENT,        PIN_VENT);
@@ -190,8 +190,8 @@ void display_decoded_signals(int sig)
 {
   if (sig & SIG_SHUTOFF)
     Serial.print("SHUTOFF ");
-  if (sig & SIG_OX)
-    Serial.print("OX ");
+  if (sig & SIG_MPV)
+    Serial.print("MPV ");
   if (sig & SIG_IGNITE)
     Serial.print("IGNITE ");
   if (sig & SIG_DISCONNECT)

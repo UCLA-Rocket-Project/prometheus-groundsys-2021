@@ -6,7 +6,7 @@
 
 // pin numbers
 #define PIN_SHUTOFF 12
-#define PIN_OX 11
+#define PIN_MPV 11
 #define PIN_IGNITE 10
 #define PIN_DISCONNECT 9
 #define PIN_VENT 8
@@ -16,7 +16,7 @@
 
 // control signal flags
 #define SIG_SHUTOFF     0b000000001 //1
-#define SIG_OX          0b000000010 //2
+#define SIG_MPV         0b000000010 //2
 #define SIG_IGNITE      0b000000100 //4
 #define SIG_DISCONNECT  0b000001000 //8
 #define SIG_VENT        0b000010000 //16
@@ -51,7 +51,7 @@ void setup()
   pinMode(PIN_DUMP, INPUT_PULLUP);
   pinMode(PIN_NITROGEN, INPUT_PULLUP);
   pinMode(PIN_NITROUS, INPUT_PULLUP);
-  pinMode(PIN_OX, INPUT_PULLUP);
+  pinMode(PIN_MPV, INPUT_PULLUP);
   pinMode(PIN_SHUTOFF, INPUT_PULLUP);
 
   // start Serial connections
@@ -70,7 +70,7 @@ void loop()
 
   // update state variable with current state of switches
   update_state(&sig, PIN_SHUTOFF, SIG_SHUTOFF);
-  update_state(&sig, PIN_OX, SIG_OX);
+  update_state(&sig, PIN_MPV, SIG_MPV);
   update_state(&sig, PIN_IGNITE, SIG_IGNITE);
   update_state(&sig, PIN_DISCONNECT, SIG_DISCONNECT);
   update_state(&sig, PIN_VENT, SIG_VENT);
@@ -134,8 +134,8 @@ void display_decoded_signals(int sig)
 {
   if (sig & SIG_SHUTOFF)
     Serial.print("SHUTOFF ");
-  if (sig & SIG_OX)
-    Serial.print("OX ");
+  if (sig & SIG_MPV)
+    Serial.print("MPV ");
   if (sig & SIG_IGNITE)
     Serial.print("IGNITE ");
   if (sig & SIG_DISCONNECT)
