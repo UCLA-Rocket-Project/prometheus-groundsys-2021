@@ -25,22 +25,37 @@
 #define SIG_NITROUS     0b010000000 //128
 //#define SIG_OTHER     0b100000000 //256 // THIS INDICATES A TEMPLATE FOR FUTURE SIGNALS IF THEY SHOULD BE ADDED
 
-// defined global constants
-#define NUM_OF_SIGNALS 8
-#define SIGNAL_LENGTH ((NUM_OF_SIGNALS % 8) ? NUM_OF_SIGNALS/8 + 1 : NUM_OF_SIGNALS/8)
-
 // configurable parameters
+#define BAUD_RATE 57600 // bits per second being transmitted
+#define OFFSET_DELAY_TX 25 // specify additional flat "delay" added to minimum calculated delay to avoid corruption
+#define SERIAL_TRANSFER_DEBUGGING true
+#define SERIAL_TRANSFER_TIMEOUT 50
 #define SIG_DECODING true
 #define DEBUGGING true
 
+// macros
+#define MIN_DELAY_TX (1/(BAUD_RATE/10))*1000*2 // refer to `https://github.com/UCLA-Rocket-Project/prometheus-groundsys-2021/blob/main/docs/safer_serial_transmission_practices.md`
+#define DELAY_TX MIN_DELAY_TX + OFFSET_DELAY_TX
+
 // link necessary libraries
+#include <SerialTransfer.h>
 #include <SoftwareSerial.h>
 
 // init SoftwareSerial connection to pad
 SoftwareSerial to_pad_connection(3, 2); // RX, TX
 
-// init `sig` to represent state of switches
-int sig = 0; // since NUM_OF_SIGNALS smaller than 16, this will work fine (2 bytes, 16 bits => at most 16 signals); should this number ever increase, we can use a bigger datatype (like long, 4 bytes)
+// init SerialTransfer
+SerialTransfer transfer_to_pad;
+
+// data packet structure
+struct Datapacket
+{
+  // representation of state of switches
+  int sig; // since our number of signals is smaller than 16, this will work fine (2 bytes, 16 bits => at most 16 signals); should this number ever increase, we can use a bigger datatype (like long, 4 bytes)
+};
+
+// init buffer for datapacket
+Datapacket dp;
 
 void setup()
 {
@@ -55,52 +70,59 @@ void setup()
   pinMode(PIN_SHUTOFF, INPUT_PULLUP);
 
   // start Serial connections
+  to_pad_connection.begin(BAUD_RATE);
+  transfer_to_pad.begin(to_pad_connection, SERIAL_TRANSFER_DEBUGGING, Serial, SERIAL_TRANSFER_TIMEOUT);
+  transfer_to_pad.reset();
+
   if (DEBUGGING)
   {
     Serial.begin(9600);
   }
-
-  to_pad_connection.begin(57600);
 }
 
 void loop()
 {
-  // reset state variable
-  sig = 0;
+  // reset data buffers
+  reset_buffers(dp);
 
   // update state variable with current state of switches
-  update_state(&sig, PIN_SHUTOFF, SIG_SHUTOFF);
-  update_state(&sig, PIN_MPV, SIG_MPV);
-  update_state(&sig, PIN_IGNITE, SIG_IGNITE);
-  update_state(&sig, PIN_DISCONNECT, SIG_DISCONNECT);
-  update_state(&sig, PIN_VENT, SIG_VENT);
-  update_state(&sig, PIN_DUMP, SIG_DUMP);
-  update_state(&sig, PIN_NITROGEN, SIG_NITROGEN);
-  update_state(&sig, PIN_NITROUS, SIG_NITROUS);
+  update_state(dp, PIN_SHUTOFF, SIG_SHUTOFF);
+  update_state(dp, PIN_MPV, SIG_MPV);
+  update_state(dp, PIN_IGNITE, SIG_IGNITE);
+  update_state(dp, PIN_DISCONNECT, SIG_DISCONNECT);
+  update_state(dp, PIN_VENT, SIG_VENT);
+  update_state(dp, PIN_DUMP, SIG_DUMP);
+  update_state(dp, PIN_NITROGEN, SIG_NITROGEN);
+  update_state(dp, PIN_NITROUS, SIG_NITROUS);
 
-  // send metadata portion of datapacket
-  to_pad_connection.write('s'); // indicate start of transmission
-  to_pad_connection.write(SIGNAL_LENGTH); // send single byte representing size of data transmitted
-
-  // send data portion of datapacket
-  for (int i = 0; i < SIGNAL_LENGTH*8; i+=8)
-    to_pad_connection.write(sig >> i); // send byte of signal state data
+  // transmit packet
+  transfer_to_pad.sendDatum(dp);
 
   // output to Serial debugging and signal decoding information
   if (DEBUGGING)
   {
     if (SIG_DECODING)
     {
-      Serial.print(sig, BIN);
+      Serial.print(dp.sig, BIN);
       Serial.print(", corresponds to: ");
-      display_decoded_signals(sig);
+      display_decoded_signals(dp.sig);
     }
     else
-      Serial.println(sig, BIN);
+      Serial.println(dp.sig, BIN);
   }
 
   // delay so we don't sample too fast :)
-  delay(10);
+  delay(DELAY_TX);
+}
+
+/*
+ * reset_buffers()
+ * -------------------------
+ * Resets all fields of global data buffer to 0.
+ */
+void reset_buffers(Datapacket& dp)
+{
+  dp.sig = 0;
 }
 
 /*
@@ -115,10 +137,10 @@ void loop()
  *   - state_encoding: binary encoding/mask for the state associated with the pin's
  *       connected switch
  */
-void update_state(int* state, int pin, int state_encoding)
+void update_state(Datapacket& dp, int pin, int state_encoding)
 {
   if (digitalRead(pin) == LOW)
-    (*state) |= state_encoding;
+    dp.sig |= state_encoding;
 }
 
 /*

@@ -25,27 +25,36 @@
 #define SIG_NITROUS     0b010000000 //128
 //#define SIG_OTHER     0b100000000 //256 // THIS INDICATES A TEMPLATE FOR FUTURE SIGNALS IF THEY SHOULD BE ADDED
 
-// defined global constants
-#define NUM_OF_SIGNALS 8
-#define SIGNAL_LENGTH ((NUM_OF_SIGNALS % 8) ? NUM_OF_SIGNALS/8 + 1 : NUM_OF_SIGNALS/8)
-
 // configurable parameters
 #define STATE_CHANGE_SIG_RUN_THRESHOLD 10 // indicates the number of consistent signals from bunker needed to change state on pad
 #define SIG_DECODING true
-#define DEBUGGING true
+#define DEBUGGING false
+#define BAUD_RATE 57600 // bits per second being transmitted
+#define OFFSET_DELAY_RX 10 // specify additional flat "delay" added to minimum calculated (for transmitting)
+
+// macros
+#define MIN_DELAY_TX (1/(BAUD_RATE/10))*1000*2 // refer to `https://github.com/UCLA-Rocket-Project/prometheus-groundsys-2021/blob/main/docs/safer_serial_transmission_practices.md`
+#define DELAY_RX MIN_DELAY_TX + OFFSET_DELAY_RX // minimum delay needed by TX end, but this generally is a good rule-of-thumb for receiving end as well :)
 
 // link necessary libraries
+#include <SerialTransfer.h>
 #include <SoftwareSerial.h>
 
 // init SoftwareSerial connection from bunker
 SoftwareSerial from_bunker_connection(3, 2); // RX, TX
 
-// init variables used by main loop
-int data_size = 0;
-int prev_sig = 0;
-int sig = 0;
-int sig_run_count = 0;
-int cur_state = 0;
+// init SerialTransfer
+SerialTransfer transfer_from_bunker;
+
+// data packet structure
+struct Datapacket
+{
+  // representation of state of switches
+  int sig; // since our number of signals is smaller than 16, this will work fine (2 bytes, 16 bits => at most 16 signals); should this number ever increase, we can use a bigger datatype (like long, 4 bytes)
+};
+
+// init buffer for datapacket
+Datapacket dp;
 
 void setup()
 {
@@ -60,100 +69,69 @@ void setup()
   pinMode(PIN_SHUTOFF, OUTPUT);
 
   // start Serial connections
+  from_bunker_connection.begin(BAUD_RATE);
+  transfer_from_bunker.begin(from_bunker_connection);
+  transfer_from_bunker.reset();
+
   if (DEBUGGING)
   {
     Serial.begin(9600);
   }
-
-  from_bunker_connection.begin(57600);
 }
 
 void loop()
 {
-  // only attempt to read data from connection if data is available and the first byte indicates the start of a packet we expect ('s')
-  if (from_bunker_connection.read() == 's')
+  // reset data buffers
+  reset_buffers(dp);
+
+  // only attempt to read data from connection if data is available
+  if (transfer_from_bunker.available())
   {
-    // second byte of packet represents our data size
-    data_size = from_bunker_connection.read();
+    // receive datapacket
+    transfer_from_bunker.rxObj(dp);
 
-    prev_sig = sig; // propogate backward the previous signal state
-    sig = 0; // setup buffer to hold incoming signal state
+    // analyze all data for this packet
+    analyze_state(dp, SIG_SHUTOFF,     PIN_SHUTOFF);
+    analyze_state(dp, SIG_MPV,         PIN_MPV);
+    analyze_state(dp, SIG_IGNITE,      PIN_IGNITE);
+    analyze_state(dp, SIG_DISCONNECT,  PIN_DISCONNECT);
+    analyze_state(dp, SIG_VENT,        PIN_VENT);
+    analyze_state(dp, SIG_DUMP,        PIN_DUMP);
+    analyze_state(dp, SIG_NITROGEN,    PIN_NITROGEN);
+    analyze_state(dp, SIG_NITROUS,     PIN_NITROUS);
 
-    // read all data for this packet
-    for (int i = 0; i < data_size; i++)
-      sig += from_bunker_connection.read() >> (i << 3); // --> i*8 but ~optimized~
-
-    // handle received signal if attempting to change from current state
-    if (sig != cur_state)
-    {
-      // check if continuing previous run
-      if (sig == prev_sig)
-      {
-        // increment run count, and check if reached threshold of state change
-        sig_run_count++;
-        
-        if (sig_run_count >= STATE_CHANGE_SIG_RUN_THRESHOLD)
-        {
-          // analyze all data for this packet
-          analyze_state(sig, SIG_SHUTOFF,     PIN_SHUTOFF);
-          analyze_state(sig, SIG_MPV,          PIN_MPV);
-          analyze_state(sig, SIG_IGNITE,      PIN_IGNITE);
-          analyze_state(sig, SIG_DISCONNECT,  PIN_DISCONNECT);
-          analyze_state(sig, SIG_VENT,        PIN_VENT);
-          analyze_state(sig, SIG_DUMP,        PIN_DUMP);
-          analyze_state(sig, SIG_NITROGEN,    PIN_NITROGEN);
-          analyze_state(sig, SIG_NITROUS,     PIN_NITROUS);
-
-          // display state change message (with signal decoding if SIG_DECODING set to true)
-          // NOTE: done after analyzing/reacting to data to not delay response time if there's an I/O error
-          if (DEBUGGING)
-          {
-            Serial.print("STATE CHANGED: ");
-            Serial.print(cur_state, BIN);
-            Serial.print(" ---> ");
-            Serial.print(sig, BIN);
-          }
-          
-          if (DEBUGGING)
-          {
-            if (SIG_DECODING)
-            {
-              Serial.print(", corresponds to: ");
-              display_decoded_signals(sig);
-            }
-            else
-              Serial.println();
-          }
-
-          // update current state tracker
-          cur_state = sig;
-
-          // reset run count for next run of a state-changing signal
-          sig_run_count = 1;
-        }
-      }
-      else // if not continuing prevous run...
-      {
-        // restart run counter, as we've encountered a new signal (different from previous)
-        sig_run_count = 1; // start at 1 to account for first of next signal appearing
-      }
-    }
-
-    // display what we received
-    // NOTE: done after analyzing/reacting to data to not delay response time if there's an I/O error
     if (DEBUGGING)
     {
-      if (SIG_DECODING)
-      {
-        Serial.print("RECEIVED: ");
-        Serial.print(sig, BIN);
-        Serial.print(", corresponds to: ");
-        display_decoded_signals(sig);
-      }
-      else
-        Serial.println(sig, BIN);
+      // format and display data to Serial monitor
+      display_dp(dp);
     }
+
+    // delay because we don't expect data transmitting that fast
+    delay(DELAY_RX);
   }
+}
+
+/*
+ * reset_buffers()
+ * -------------------------
+ * Resets all fields of global data buffer to 0.
+ */
+void reset_buffers(Datapacket& dp)
+{
+  dp.sig = 0;
+}
+
+/*
+ * display_dp()
+ * -------------------------
+ * Formats and displays received data in comma-separated form to Serial.
+ */
+void display_dp(const Datapacket& dp)
+{
+  Serial.print("RECEIVED: ");
+  Serial.print(dp.sig, BIN);
+  Serial.print(", corresponds to: ");
+  display_decoded_signals(dp.sig);
 }
 
 /*
@@ -169,9 +147,9 @@ void loop()
  *       with the specified pin
  *   - output_pin: digital pin to set to HIGH/LOW based on signal's presence
  */
-void analyze_state(int sig_data, int sig_mask, int output_pin)
+void analyze_state(Datapacket& dp, int sig_mask, int output_pin)
 {
-  if (sig_data & sig_mask)
+  if (dp.sig & sig_mask)
     digitalWrite(output_pin, HIGH);
   else
     digitalWrite(output_pin, LOW);
