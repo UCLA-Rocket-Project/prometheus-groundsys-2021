@@ -6,16 +6,18 @@
 
 // pin numbers
 #define PIN_PT0 A5
+#define PIN_PT1 A3
+#define PIN_LC A1
 
 // configurable parameters
 #define DEBUGGING false
 #define BAUD_RATE 57600 // bits per second being transmitted
-#define OFFSET_DELAY_TX 25 // specify additional flat "delay" added to minimum calculated delay to avoid corruption
+#define OFFSET_DELAY_TX 50 //was 25 // specify additional flat "delay" added to minimum calculated delay to avoid corruption
 #define SERIAL_TRANSFER_TIMEOUT 50
 #define SERIAL_TRANSFER_DEBUGGING true
-#define NUM_OF_PT 1
+#define NUM_OF_PT 2
 #define NUM_OF_TC 0
-#define NUM_OF_LC 0
+#define NUM_OF_LC 1
 
 /* NOTES:
  *  - TX_DELAY, the lower it is, leads to more often CRC errors, and eventually stale packet issues
@@ -31,8 +33,11 @@
 #define DELAY_TX MIN_DELAY_TX + OFFSET_DELAY_TX
 
 // calibration factors
-const float PT_OFFSET[NUM_OF_PT] = {-245.38}; // PT5, PT3: -209.38, 11.924
-const float PT_SCALE[NUM_OF_PT] = {248.41}; // PT5, PT3: 244.58, 178.51
+const float PT_OFFSET[NUM_OF_PT] = {-245.38, -247.99}; // PT5, PT3: -209.38, 11.924
+const float PT_SCALE[NUM_OF_PT] = {248.41, 247.72}; // PT5, PT3: 244.58, 178.51
+
+const float LC_OFFSET = -5.0864;
+const float LC_SCALE = 190.43;
 
 // link necessary libraries
 #include <SerialTransfer.h>
@@ -50,9 +55,8 @@ struct Datapacket
   // data portion
   unsigned long timestamp;
   float pt0_data;
-
-  // data checksum
-  float checksum;
+  float pt1_data;
+  float lc_data;
 };
 
 // init buffer for datapacket
@@ -79,9 +83,8 @@ void loop()
   // poll data, preprocess (if needed), and store in datapacket
   dp.timestamp = millis();
   dp.pt0_data = get_psi_from_raw_pt_data(analogRead(PIN_PT0), 0);
-
-  // compute and update checksum
-  update_checksum(dp);
+  dp.pt1_data = get_psi_from_raw_pt_data(analogRead(PIN_PT1), 1);
+  dp.lc_data = get_lbf_from_raw_lc_data(analogRead(PIN_LC));
 
   // transmit packet
   transfer_to_bunker.sendDatum(dp);
@@ -92,6 +95,10 @@ void loop()
     Serial.print(dp.timestamp);
     Serial.print(',');
     Serial.print(dp.pt0_data);
+    Serial.print(',');
+    Serial.print(dp.pt1_data);
+    Serial.print(',');
+    Serial.println(dp.lc_data);
   }
 
   // delay so we don't sample/transmit too fast :)
@@ -126,6 +133,8 @@ void reset_buffers(Datapacket& dp)
 {
   dp.timestamp = 0;
   dp.pt0_data = 0;
+  dp.pt1_data = 0;
+  dp.lc_data = 0;
 }
 
 /*
@@ -156,7 +165,7 @@ float get_psi_from_raw_pt_data(int raw_data, int pt_num)
   return psi;
 }
 
-/*float get_lbf_from_raw_lc_data(int raw_data)
+float get_lbf_from_raw_lc_data(int raw_data)
 {
   // get calibration factors for LC
   float offset = LC_OFFSET;
@@ -170,9 +179,4 @@ float get_psi_from_raw_pt_data(int raw_data, int pt_num)
 
   // return value
   return lbf;
-}*/
-
-void update_checksum(Datapacket& dp)
-{
-  dp.checksum = dp.pt0_data;
 }
