@@ -5,17 +5,25 @@
  */
 
 // pin numbers
-#define PIN_PT0 A5
-#define PIN_PT1 A3
-#define PIN_LC A1
+#define PIN_PT0 A3
+#define PIN_PT1 A4
+#define PIN_PT2 A5
+#define PIN_LC A2
+
+// validity flag encodings
+#define F_PT0 0b00000001 //1
+#define F_PT1 0b00000010 //2
+#define F_PT2 0b00000100 //4
+#define F_LC  0b00001000 //8
+//#define F_OTHER 0b00010000 //16
 
 // configurable parameters
 #define DEBUGGING false
 #define BAUD_RATE 57600 // bits per second being transmitted
-#define OFFSET_DELAY_TX 50 //was 25 // specify additional flat "delay" added to minimum calculated delay to avoid corruption
+#define OFFSET_DELAY_TX 50 // specify additional flat "delay" added to minimum calculated delay to avoid corruption
 #define SERIAL_TRANSFER_TIMEOUT 50
 #define SERIAL_TRANSFER_DEBUGGING true
-#define NUM_OF_PT 2
+#define NUM_OF_PT 3
 #define NUM_OF_TC 0
 #define NUM_OF_LC 1
 
@@ -33,8 +41,8 @@
 #define DELAY_TX MIN_DELAY_TX + OFFSET_DELAY_TX
 
 // calibration factors
-const float PT_OFFSET[NUM_OF_PT] = {-245.38, -247.99}; // PT5, PT3: -209.38, 11.924
-const float PT_SCALE[NUM_OF_PT] = {248.41, 247.72}; // PT5, PT3: 244.58, 178.51
+const float PT_OFFSET[NUM_OF_PT] = {-209.38, 11.924, -42069};
+const float PT_SCALE[NUM_OF_PT] = {244.58, 178.51, 1};
 
 const float LC_OFFSET = -5.0864;
 const float LC_SCALE = 190.43;
@@ -56,6 +64,7 @@ struct Datapacket
   unsigned long timestamp;
   float pt0_data;
   float pt1_data;
+  float pt2_data;
   float lc_data;
 };
 
@@ -84,6 +93,7 @@ void loop()
   dp.timestamp = millis();
   dp.pt0_data = get_psi_from_raw_pt_data(analogRead(PIN_PT0), 0);
   dp.pt1_data = get_psi_from_raw_pt_data(analogRead(PIN_PT1), 1);
+  dp.pt2_data = get_psi_from_raw_pt_data(analogRead(PIN_PT2), 2);
   dp.lc_data = get_lbf_from_raw_lc_data(analogRead(PIN_LC));
 
   // transmit packet
@@ -97,6 +107,8 @@ void loop()
     Serial.print(dp.pt0_data);
     Serial.print(',');
     Serial.print(dp.pt1_data);
+    Serial.print(',');
+    Serial.print(dp.pt2_data);
     Serial.print(',');
     Serial.println(dp.lc_data);
   }
@@ -134,6 +146,7 @@ void reset_buffers(Datapacket& dp)
   dp.timestamp = 0;
   dp.pt0_data = 0;
   dp.pt1_data = 0;
+  dp.pt2_data = 0;
   dp.lc_data = 0;
 }
 
